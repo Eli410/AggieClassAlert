@@ -4,17 +4,23 @@ import requests
 import json
 
 
+def get_all_terms():
+    link = 'https://howdy.tamu.edu/api/all-terms'
+    res = requests.get(link)
+    if res.status_code != 200:
+        raise Exception(f"Failed to fetch term data from {link}")
+    try:
+        return res.json()
+    except:
+        raise Exception(f"Failed to parse term data from {link}")
 
 class_list = "https://howdy.tamu.edu/api/course-sections"
 
-
-terms_list={
-  "Fall 2024 - Galveston" : "202432",
-  "Fall 2024 - College Station" : "202431",
-  "Summer 2024 - Galveston" : "202422",
-  "Summer 2024 - College Station" : "202421",
-}
-
+# terms_list={
+#   "Spring 2024 - Galveston" : "202412",
+#   "Spring 2024 - College Station" : "202411",
+# }
+terms_list = {res['STVTERM_DESC']: res['STVTERM_CODE'] for res in get_all_terms() if ('2025' in res['STVTERM_DESC'])}
 
 class Classes:
   def __init__(self, terms) -> None:
@@ -36,7 +42,7 @@ class Classes:
       instructor=json.loads(class_['SWV_CLASS_SEARCH_INSTRCTR_JSON']) if class_['SWV_CLASS_SEARCH_INSTRCTR_JSON'] else [{'NAME' : "None"}]
       for i in instructor:
         instructors.append(i['NAME'])
-    return sorted(set(instructors))
+    return list(set(sorted(instructors)))
      
   def search(self, subject_code, section=None):
     out=[]
@@ -68,8 +74,9 @@ class Classes:
       if classes['SWV_CLASS_SEARCH_CRN']==str(crn):
         return classes
 
+
   async def get_availability(self, crn):
-    url = f"https://compass-ssb.tamu.edu/pls/PROD/bwykschd.p_disp_detail_sched?term_in={self.terms}&crn_in={crn}"
+    url = f"https://compass-ssb.tamu.edu/pls/PROD/bwxkschd.p_disp_detail_sched?term_in={self.terms}&crn_in={crn}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             if response.status == 200:
@@ -79,14 +86,19 @@ class Classes:
             else:
                 print("Failed to retrieve the webpage. Status code:", response.status)
 
+    for class_ in self.classes:
+       if class_['SWV_CLASS_SEARCH_CRN'] == str(crn):
+          # backup = class_['STUSEAT_OPEN']
+          backup = ''
+          break
     a = [p.get_text() for p in paragraphs if 'Remaining' in p.get_text()]
     try:
       a = a[-1].split('\n')
       x = a.index('Seats')
     except:
-      return {'Capacity': -1, 'Taken': -1, 'Available': -1}
+      return {'Capacity': -1, 'Taken': -1, 'Available': -1, 'backup': backup}
 
-    return {'Capacity': a[x+1], 'Taken': a[x+2], 'Available': a[x+3]}
+    return {'Capacity': a[x+1], 'Taken': a[x+2], 'Available': a[x+3], 'backup': backup}
     
 
   def search_by_crn(self, crn):
@@ -174,10 +186,10 @@ def replace_task(user_id, old_task, new_task=None):
 
 
 
-terms_object={
-    "202432" : Classes('Fall 2024 - Galveston'),
-    "202431" : Classes("Fall 2024 - College Station"), 
-    "202422" : Classes('Summer 2024 - Galveston'),
-    "202421" : Classes("Summer 2024 - College Station")
-}
 
+# terms_object={
+#     "202412" : Classes('Spring 2024 - Galveston'),
+#     "202411" : Classes("Spring 2024 - College Station"),
+# }
+
+terms_object={res['STVTERM_CODE']: Classes(res['STVTERM_DESC']) for res in get_all_terms() if ('2025' in res['STVTERM_DESC'])}

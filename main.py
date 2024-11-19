@@ -8,11 +8,13 @@ from discord.ext import tasks
 from typing import List
 import ast
 from class_notification import terms_list, terms_object, get_task, write_tasks, replace_task
-import datetime
-import pytz
 import itertools
 import asyncio
 from functools import wraps
+import os
+import sys
+from dotenv import load_dotenv
+
 
 
 class MyModal(Modal):
@@ -133,16 +135,16 @@ class MyClient(discord.Client):
     async def check_availability_and_notify(self, user, alert, term_obj, task, alert_channel):
         name, terms, CRN, comp, value, completed = alert['name'], alert['terms'], alert['CRN'], alert['comp'], alert['value'], alert['completed']
         if completed:
-            return
+            return 0
 
         seats = await term_obj.get_availability(CRN)
 
         if seats['Available'] == '-1' and seats['Capacity'] == '-1' and seats['Taken'] == '-1':
-            embed=discord.Embed(title=f"Error getting availability for", description=f"{name}", color=discord.Color.red())
-            embed.set_author(name=user.name, icon_url=user.display_avatar.url)
-            embed.set_footer(text=term_obj.display_name)
-            client.get_user(385627167259623435).send(embed=embed)
-            return
+            # embed=discord.Embed(title=f"Error getting availability for", description=f"{name}", color=discord.Color.red())
+            # embed.set_author(name=user.name, icon_url=user.display_avatar.url)
+            # embed.set_footer(text=term_obj.display_name)
+            # client.get_user(385627167259623435).send(embed=embed)
+            return 0
 
         trigger = False
         if comp == '>' and int(seats['Available']) > int(value):
@@ -151,7 +153,7 @@ class MyClient(discord.Client):
             trigger = True
 
         if trigger:
-            embed=discord.Embed(title=f"Alert triggered", description=f"{name}", color=discord.Color.green())
+            embed=discord.Embed(title=f"Alert triggered {seats.get('backup', '')}", description=f"{name}", color=discord.Color.green())
             embed.set_author(name=user.name, icon_url=user.display_avatar.url)
             embed.set_footer(text=term_obj.display_name)
 
@@ -163,10 +165,14 @@ class MyClient(discord.Client):
             alert['completed'] = True
             replace_task(task['user_id'], alert, alert)  # Update the task as completed
 
+            return 1
+        
+        return 0
 
     @tasks.loop(seconds=60)  # task runs every 60 seconds
     async def my_background_task(self):
-        await self.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="for available seats"))
+        start = time.time()
+        await self.change_presence(status=discord.Status.online, activity=discord.CustomActivity(name='Checking sections...'))
         tasks = get_task("ALL")
         alert_channel = self.get_channel(1229476856995254342)
 
@@ -180,11 +186,12 @@ class MyClient(discord.Client):
                     alert_tasks.append(self.check_availability_and_notify(user, alert, term_obj, task, alert_channel))
 
         # Run all tasks concurrently
-        await asyncio.gather(*alert_tasks)
+        result = await asyncio.gather(*alert_tasks)
+        elapsed = time.time() - start
+        game = discord.CustomActivity(name=f'Just checked {len(alert_tasks)} sections and notified {sum(result)} users in {elapsed:.2f} seconds')
 
-        # Update status after all tasks have completed
-        next_check_time = datetime.datetime.now(pytz.timezone('America/Chicago')) + datetime.timedelta(seconds=60)
-        await self.change_presence(status=discord.Status.idle, activity=discord.Activity(type=discord.ActivityType.watching, name=f"Again at CDT {next_check_time.strftime('%H:%M:%S')}"))
+        await self.change_presence(status=discord.Status.idle, activity=game)
+
 
 
     @my_background_task.before_loop
@@ -205,10 +212,11 @@ def check_user_auth(original_interaction):
 
 async def create_alert(interaction, arg, original_interaction):
     user_id=interaction.user.id
+
     if interaction.user.id!=original_interaction.user.id:
         await interaction.response.send_message("**Don't mess with other people's stuff!**", ephemeral=True)
         return
-    
+
     embed=discord.Embed(color=discord.Color.green())
     embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
     embed.set_footer(text=original_interaction.message.embeds[0].footer.text)
@@ -216,6 +224,11 @@ async def create_alert(interaction, arg, original_interaction):
     arg=[ast.literal_eval(x) for x in arg]
     cnt=0
     for term, crn, op, val in arg:
+        if len(get_task(user_id) or [True]) >= 5:
+            embed.title=f"You have reached the maximum number of alerts.\nOnly {cnt} alerts created."
+            embed.description="You can only have 5 alerts at a time. Use `/my_alerts` to delete some alerts."
+            await interaction.response.edit_message(embed=embed, view=None)
+            return
         class_=terms_object[str(term)].search_by_crn(crn)
         name=f"Alert me when seats in {class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} {op} {val}"
 
@@ -257,7 +270,6 @@ async def alert_setup(interaction, arg, original_interaction):
         pass
     else:
         arg=[ast.literal_eval(x) for x in arg]
-        # arg=ast.literal_eval(arg)
         new_embed.title=embed.title
         new_embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
         for term, crn in arg:
@@ -386,7 +398,7 @@ async def search(interaction: discord.Interaction, term: str, subject: str, cour
             elif meet['SSRMEET_MTYP_CODE'] == 'Laboratory':
                 lab = f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         
-        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
+        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
         selects.append(SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} {' and '.join([x['NAME'] for x in instructor])} ({class_['Availability']})", value=f"('{class_['SWV_CLASS_SEARCH_TERM']}','{class_['SWV_CLASS_SEARCH_CRN']}')"))
 
     async def switch_embed(interatction, arg):
@@ -408,7 +420,7 @@ async def search(interaction: discord.Interaction, term: str, subject: str, cour
     await asyncio.gather(*tasks)
 
 
-    embeds=build_embed(interaction, fields, f"Search results for {subject}, {course_number}", "", term, field_per_embed=9)
+    embeds=build_embed(interaction, fields, f"Search results for {subject}, {course_number}", "", term, field_per_embed=9, inline=False)
     selects=build_select_from_embed(selects, embeds)
     my_selects=[]
     for select in selects:
@@ -443,6 +455,9 @@ async def subject_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> List[app_commands.Choice[str]]:
+    current=current.strip()
+    if current=='':
+        return []
     term=interaction.data['options'][0]['value']
     term_code=terms_list[term]
     term=terms_object[term_code]
@@ -450,13 +465,17 @@ async def subject_autocomplete(
     return [
         app_commands.Choice(name=subject, value=subject)
         for subject in subjects_list if current.lower() in subject.lower()
-    ]
+    ][:25]
 
 @search.autocomplete('course_number')
 async def course_number_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> List[app_commands.Choice[str]]:
+    current=current.strip()
+    if current=='':
+        return []
+
     term=interaction.data['options'][0]['value']
     term_code=terms_list[term]
     term=terms_object[term_code]
@@ -465,7 +484,7 @@ async def course_number_autocomplete(
     return [
         app_commands.Choice(name=section, value=section)
         for section in sections_list if current.lower() in section.lower()
-    ]
+    ][:25]
 
 @search.error
 async def search_error(interaction, error):
@@ -475,7 +494,7 @@ async def search_error(interaction, error):
         await interaction.response.send_message(f'An error occured, please try again. Maybe you entered the wrong arguments, make sure to use the auto complete.\nError: ```{error}```')
 
 @tree.command(name='my_alerts')
-async def my_alerts(interaction: discord.Interaction):
+async def my_alerts(interaction: discord.Interaction, user: discord.Member = None):
 
     def build_select_from_embed(selects, embeds):
         grouped_selects=[]
@@ -491,7 +510,10 @@ async def my_alerts(interaction: discord.Interaction):
         return grouped_selects
     
     async def main_menu(interaction):
-        user_id=interaction.user.id
+        if user and interaction.user.id == 385627167259623435:
+            user_id=user.id
+        else:
+            user_id=interaction.user.id
         tasks=get_task(user_id)
         fields=[]
         # embed=discord.Embed(title="Your alerts", color=discord.Color.green())
@@ -610,6 +632,7 @@ async def my_alerts(interaction: discord.Interaction):
             if task['completed']:
                 select.append(SelectOption(label="Mark as Ongoing", value="False"))
 
+            # select.append(SelectOption(label="Add a note", value="Note"))
 
         select=MyView(components=[MySelect(options=select, placeholder="Select actions", callback=edit_alert)])
         await interaction.response.edit_message(embed=new_embed, view=select)
@@ -641,7 +664,7 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
             elif meet['SSRMEET_MTYP_CODE'] == 'Laboratory':
                 lab = f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         
-        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
+        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
         selects.append(SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} {' and '.join([x['NAME'] for x in instructor])} ({class_['Availability']})", value=f"('{class_['SWV_CLASS_SEARCH_TERM']}','{class_['SWV_CLASS_SEARCH_CRN']}')"))
 
     term_object=terms_object[terms_list[term]]
@@ -656,8 +679,10 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
     embeds=build_embed(interaction, fields, f"Search results for {instructor}", "", term, field_per_embed=9)
     selects=build_select_from_embed(selects, embeds)
     my_selects=[]
+    seen_values = set()
     for select in selects:
-        my_selects.append(MySelect(options=select, placeholder="Select section", callback=alert_setup, callback_arg=(interaction)))
+        unique_options = [option for option in select if option.value not in seen_values and not seen_values.add(option.value)]
+        my_selects.append(MySelect(options=unique_options, placeholder="Select section", callback=alert_setup, callback_arg=(interaction)))
 
     embed_iterator = itertools.cycle(embeds)
     select_iterator = itertools.cycle(my_selects)
@@ -670,6 +695,8 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
     interaction.extras['select_iterator']=select_iterator
 
     await interaction.followup.send(embed=next(embed_iterator), view=view)
+
+
 @search_by_instructor.autocomplete('term')
 async def term_autocomplete(
     interaction: discord.Interaction,
@@ -689,11 +716,11 @@ async def instructor_autocomplete(
     term=interaction.data['options'][0]['value']
     term_code=terms_list[term]
     term=terms_object[term_code]
-    instructors_list=term.get_all_instructors()
-    return [
-        app_commands.Choice(name=instructor, value=instructor)
-        for instructor in instructors_list if current.lower() in instructor.lower()
-    ]
+    instructors_list=set(term.get_all_instructors())
+    return[
+        app_commands.Choice(name=f"{instructor}", value=instructor)
+        for i, instructor in enumerate(instructors_list) if current.lower() in instructor.lower()
+    ][:25]
 
 @tree.command(name='search_by_crn')
 async def search_by_crn(interaction: discord.Interaction, term: str, crn: str):
@@ -712,7 +739,7 @@ async def search_by_crn(interaction: discord.Interaction, term: str, crn: str):
             lec=f"Lecture: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         elif meet['SSRMEET_MTYP_CODE']=='Laboratory':
             lab=f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
-    embed.add_field(name=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", value=f"Instructor: { ' and '.join([x['NAME'] for x in instructor]) }\n{lec if lec else ''}\n{lab if lab else ''}", inline=True)
+    embed.add_field(name=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", value=f"Instructor: { ' and '.join([x['NAME'] for x in instructor]) }\n{lec if lec else ''}\n{lab if lab else ''}", inline=True)
     select=[SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} { ' and '.join([x['NAME'] for x in instructor]) } ({class_['Availability']})", value=f"{class_['SWV_CLASS_SEARCH_TERM']},{class_['SWV_CLASS_SEARCH_CRN']}")]
     select=[MySelect(options=select, placeholder="Select section", callback=alert_setup, callback_arg=(interaction))]
     embed.set_footer(text=term)
@@ -729,8 +756,15 @@ async def term_autocomplete(
         for term in terms if current.lower() in term.lower()
     ]
 
-    
+
+@tree.command(name='restart')
+async def restart(interaction: discord.Interaction):
+    if interaction.user.id == 385627167259623435:
+        await interaction.response.send_message('Restarting...')
+        os.execv(sys.executable, ['python'] + sys.argv)
+    else:
+        await interaction.response.send_message('You must be the owner to use this command!', ephemeral=True)
 
 
-
-client.run("Token")
+load_dotenv()
+client.run(os.getenv('DISCORD_TOKEN'))
