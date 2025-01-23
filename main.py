@@ -14,6 +14,7 @@ from functools import wraps
 import os
 import sys
 from dotenv import load_dotenv
+import traceback
 
 
 
@@ -137,23 +138,10 @@ class MyClient(discord.Client):
         if completed:
             return 0
 
-        seats = await term_obj.get_availability(CRN)
+        isOpen = await term_obj.get_availability(CRN)
 
-        if seats['Available'] == '-1' and seats['Capacity'] == '-1' and seats['Taken'] == '-1':
-            # embed=discord.Embed(title=f"Error getting availability for", description=f"{name}", color=discord.Color.red())
-            # embed.set_author(name=user.name, icon_url=user.display_avatar.url)
-            # embed.set_footer(text=term_obj.display_name)
-            # client.get_user(385627167259623435).send(embed=embed)
-            return 0
-
-        trigger = False
-        if comp == '>' and int(seats['Available']) > int(value):
-            trigger = True
-        elif comp == '=' and int(seats['Available']) == int(value):
-            trigger = True
-
-        if trigger:
-            embed=discord.Embed(title=f"Alert triggered {seats.get('backup', '')}", description=f"{name}", color=discord.Color.green())
+        if isOpen:
+            embed=discord.Embed(title=f"Alert triggered", description=f"{name}", color=discord.Color.green())
             embed.set_author(name=user.name, icon_url=user.display_avatar.url)
             embed.set_footer(text=term_obj.display_name)
 
@@ -175,6 +163,8 @@ class MyClient(discord.Client):
         await self.change_presence(status=discord.Status.online, activity=discord.CustomActivity(name='Checking sections...'))
         tasks = get_task("ALL")
         alert_channel = self.get_channel(1229476856995254342)
+        for obj in terms_object.values():
+            obj.refresh_classes()
 
         # Prepare tasks for all alerts
         alert_tasks = []
@@ -381,12 +371,10 @@ async def search(interaction: discord.Interaction, term: str, subject: str, cour
 
     async def process_class(class_, term_object):
         instructor = json.loads(class_['SWV_CLASS_SEARCH_INSTRCTR_JSON']) if class_['SWV_CLASS_SEARCH_INSTRCTR_JSON'] else [{'NAME': "None"}]
-        try:
-            seats = await term_object.get_availability(class_['SWV_CLASS_SEARCH_CRN'])
-        except:
-            seats = {'Capacity': '-1', 'Taken': '-1', 'Available': '-1'}
+        isOpen = await term_object.get_availability(class_['SWV_CLASS_SEARCH_CRN'])
 
-        class_['Availability'] = f"{seats['Available']}/{seats['Capacity']}"
+
+        class_['Availability'] = 'Open' if isOpen else 'Full'
         
         lec = None
         lab = None
@@ -398,7 +386,7 @@ async def search(interaction: discord.Interaction, term: str, subject: str, cour
             elif meet['SSRMEET_MTYP_CODE'] == 'Laboratory':
                 lab = f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         
-        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
+        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
         selects.append(SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} {' and '.join([x['NAME'] for x in instructor])} ({class_['Availability']})", value=f"('{class_['SWV_CLASS_SEARCH_TERM']}','{class_['SWV_CLASS_SEARCH_CRN']}')"))
 
     async def switch_embed(interatction, arg):
@@ -488,10 +476,11 @@ async def course_number_autocomplete(
 
 @search.error
 async def search_error(interaction, error):
+    error_traceback = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     if interaction.response.is_done():
-        await interaction.edit_original_response(content=f'An error occured, please try again. Maybe you entered the wrong arguments, make sure to use the auto complete.\nError: ```{error}```')
+        await interaction.edit_original_response(content=f'An error occurred, please try again. Maybe you entered the wrong arguments, make sure to use the auto complete.\nError: ```{error_traceback}```')
     else:
-        await interaction.response.send_message(f'An error occured, please try again. Maybe you entered the wrong arguments, make sure to use the auto complete.\nError: ```{error}```')
+        await interaction.response.send_message(f'An error occurred, please try again. Maybe you entered the wrong arguments, make sure to use the auto complete.\nError: ```{error_traceback}```')
 
 @tree.command(name='my_alerts')
 async def my_alerts(interaction: discord.Interaction, user: discord.Member = None):
@@ -647,12 +636,9 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
     await interaction.response.defer()
     async def process_class(class_, term_object):
         instructor = json.loads(class_['SWV_CLASS_SEARCH_INSTRCTR_JSON']) if class_['SWV_CLASS_SEARCH_INSTRCTR_JSON'] else [{'NAME': "None"}]        
-        try:
-            seats = await term_object.get_availability(class_['SWV_CLASS_SEARCH_CRN'])
-        except:
-            seats = {'Capacity': '-1', 'Taken': '-1', 'Available': '-1'}
+        isOpen = await term_object.get_availability(class_['SWV_CLASS_SEARCH_CRN'])
 
-        class_['Availability'] = f"{seats['Available']}/{seats['Capacity']}"
+        class_['Availability'] = 'Open' if isOpen else 'Full'
         
         lec = None
         lab = None
@@ -664,7 +650,7 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
             elif meet['SSRMEET_MTYP_CODE'] == 'Laboratory':
                 lab = f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         
-        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
+        fields.append((f"Section: {class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", f"Instructor: {' and '.join([x['NAME'] for x in instructor])}\n{lec if lec else ''}\n{lab if lab else ''}"))
         selects.append(SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} {' and '.join([x['NAME'] for x in instructor])} ({class_['Availability']})", value=f"('{class_['SWV_CLASS_SEARCH_TERM']}','{class_['SWV_CLASS_SEARCH_CRN']}')"))
 
     term_object=terms_object[terms_list[term]]
@@ -728,8 +714,8 @@ async def search_by_crn(interaction: discord.Interaction, term: str, crn: str):
     class_=term_object.search_by_crn(crn)
     embed=discord.Embed(title=f"Search results for {crn}", color=discord.Color.green())
     instructor=json.loads(class_['SWV_CLASS_SEARCH_INSTRCTR_JSON']) if class_['SWV_CLASS_SEARCH_INSTRCTR_JSON'] else [{'NAME' : "None"}]
-    seats= await term_object.get_availability(crn)
-    class_['Availability']=f"{seats['Available']}/{seats['Capacity']}"
+    isOpen = await term_object.get_availability(crn)
+    class_['Availability']='Open' if isOpen else 'Full'
     lec=None
     lab=None
     meet_time=json.loads(class_['SWV_CLASS_SEARCH_JSON_CLOB'])
@@ -739,7 +725,7 @@ async def search_by_crn(interaction: discord.Interaction, term: str, crn: str):
             lec=f"Lecture: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
         elif meet['SSRMEET_MTYP_CODE']=='Laboratory':
             lab=f"Lab: {''.join(value for key, value in meet.items() if key.endswith('_DAY') and value is not None)} {meet['SSRMEET_BEGIN_TIME']+'-'+meet['SSRMEET_END_TIME'] if meet['SSRMEET_BEGIN_TIME'] else ''} {meet['SSRMEET_BLDG_CODE'] if meet['SSRMEET_BLDG_CODE'] else ''} {meet['SSRMEET_ROOM_CODE'] if meet['SSRMEET_ROOM_CODE'] else ''}"
-    embed.add_field(name=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']}) {seats.get('backup', '')}", value=f"Instructor: { ' and '.join([x['NAME'] for x in instructor]) }\n{lec if lec else ''}\n{lab if lab else ''}", inline=True)
+    embed.add_field(name=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} ({class_['Availability']})", value=f"Instructor: { ' and '.join([x['NAME'] for x in instructor]) }\n{lec if lec else ''}\n{lab if lab else ''}", inline=True)
     select=[SelectOption(label=f"{class_['SWV_CLASS_SEARCH_SUBJECT']} {class_['SWV_CLASS_SEARCH_COURSE']}-{class_['SWV_CLASS_SEARCH_SECTION']} { ' and '.join([x['NAME'] for x in instructor]) } ({class_['Availability']})", value=f"{class_['SWV_CLASS_SEARCH_TERM']},{class_['SWV_CLASS_SEARCH_CRN']}")]
     select=[MySelect(options=select, placeholder="Select section", callback=alert_setup, callback_arg=(interaction))]
     embed.set_footer(text=term)

@@ -1,5 +1,3 @@
-import aiohttp
-from bs4 import BeautifulSoup
 import requests
 import json
 
@@ -25,11 +23,19 @@ terms_list = {res['STVTERM_DESC']: res['STVTERM_CODE'] for res in get_all_terms(
 class Classes:
   def __init__(self, terms) -> None:
     self.terms=terms_list[terms]
-    self.classes = requests.post(class_list, json={"startRow":0,"endRow":0,"termCode":terms_list[terms],"publicSearch":"Y"}).json()
+    self.classes = None
+    self.refresh_classes()
     self.subject_code=sorted(set([x['SWV_CLASS_SEARCH_SUBJECT_DESC'] for x in self.classes]))
     self.display_name=terms
 
+  def refresh_classes(self):
+    response = requests.post(class_list, json={"startRow":0,"endRow":0,"termCode":self.terms,"publicSearch":"Y"})
 
+    if response.status_code != 200:
+      raise Exception(f"Failed to fetch class data for term {self.terms}")
+    
+    self.classes = response.json()
+  
   def get_all_classes(self, subject_code):
     return [x for x in self.classes if x['SWV_CLASS_SEARCH_SUBJECT_DESC']==subject_code]
 
@@ -76,30 +82,13 @@ class Classes:
 
 
   async def get_availability(self, crn):
-    url = f"https://compass-ssb.tamu.edu/pls/PROD/bwxkschd.p_disp_detail_sched?term_in={self.terms}&crn_in={crn}"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                text = await response.text()
-                soup = BeautifulSoup(text, 'html.parser')
-                paragraphs = soup.find_all('table')
-            else:
-                print("Failed to retrieve the webpage. Status code:", response.status)
 
-    for class_ in self.classes:
-       if class_['SWV_CLASS_SEARCH_CRN'] == str(crn):
-          # backup = class_['STUSEAT_OPEN']
-          backup = ''
-          break
-    a = [p.get_text() for p in paragraphs if 'Remaining' in p.get_text()]
-    try:
-      a = a[-1].split('\n')
-      x = a.index('Seats')
-    except:
-      return {'Capacity': -1, 'Taken': -1, 'Available': -1, 'backup': backup}
+    for classes in self.classes:
+      if classes['SWV_CLASS_SEARCH_CRN']==str(crn):
+        return classes['STUSEAT_OPEN'] == 'Y'
+      
+    return False
 
-    return {'Capacity': a[x+1], 'Taken': a[x+2], 'Available': a[x+3], 'backup': backup}
-    
 
   def search_by_crn(self, crn):
     for classes in self.classes:

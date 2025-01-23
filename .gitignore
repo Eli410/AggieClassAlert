@@ -1,5 +1,6 @@
 __pycache__/
 *.DS_Store
 *.json
+!/format_example/*.json
 env/
 .env
