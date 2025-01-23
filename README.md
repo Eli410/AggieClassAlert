@@ -23,4 +23,4 @@ Once you searched for a class, an embed with all the sections will show up, you 
 ## Notes:
 1. All the arguments have auto-fill, to ensure you entered the correct arguments, start typing out the argument and discord will automatically return the search result for the closest result, the use **TAB** key or click on the argument.
 
-2. **The bot will attempt to DM you if the alert you setup has been triggered, if it fails, it will notify you in the #alert channel in the discord server**
+2. The bot will notify you in the #alert channel in the discord server
