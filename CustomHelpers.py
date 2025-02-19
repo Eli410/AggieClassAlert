@@ -1,13 +1,5 @@
 import json
 
-
-async def check_permission(new, old):
-    if old.user != new.user:
-        command = old.client.COMMANDS[new.command.name]
-        await new.response.send_message(content=f"This is not your search! Run the command </{command.name}:{command.id}>", ephemeral=True)
-        return False
-    return True
-
 def recursive_parse_json(json_str):
     try:
         # Try parsing the string as JSON

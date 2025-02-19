@@ -188,13 +188,22 @@ class Howdy_API:
                 meeting_parts.append(f"{mtyp}: {day_str} {time_str} at {location_str}")
             out["MEETING_MESSAGE"] = "\n".join(meeting_parts)
 
-
-
-
-
         out['ERRORS'] = error
             
         return out
+    
+    def get_availability(self):
+        out = {}
+
+        for term in self.terms:
+            t = {}
+            for c in self.get_classes(term['STVTERM_CODE']):
+                t[c['SWV_CLASS_SEARCH_CRN']] = c['STUSEAT_OPEN'] == 'Y'
+            
+            out[term['STVTERM_CODE']] = t
+
+        return out
+
 
 HOWDY_API = Howdy_API()
 

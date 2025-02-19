@@ -1,6 +1,6 @@
 from discord import Embed, app_commands
 import discord
-from task_db import write_tasks
+from taskDB import write_tasks
 import datetime
 from discord.ui import View, Button, Select, TextInput, Modal
 from api import HOWDY_API
@@ -43,7 +43,7 @@ class SearchInstructorView(View):
             term, crn = arg.split('-')
             section_details = await HOWDY_API.get_section_details(term, crn)
             name = f"{section_details['SUBJECT_CODE']} {section_details['COURSE_NUMBER']}-{section_details['SECTION_NUMBER']}"
-            if write_tasks(interaction.user.id, [(name, self.term, crn, '>', '0')]):
+            if write_tasks(interaction.user.id, [(name, self.term, crn)]):
                 success.append(name)
             else:
                 failure.append(name)
@@ -83,7 +83,7 @@ class SearchInstructorView(View):
                 selects.append(new_select())
 
             pages[-1].add_field(
-                name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_TITLE']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}", 
+                name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_CRN']}) ({cls['SWV_CLASS_SEARCH_TITLE']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}", 
                 value=f"{meeting_info.get('Lecture', '')}\n{meeting_info.get('Laboratory', '')}", 
                 inline=False)
             
@@ -104,8 +104,6 @@ class SearchInstructorView(View):
                 child.disabled = self.current_page == len(self.embeds) - 1
             elif isinstance(child, Button) and child.custom_id == "Prev":
                 child.disabled = self.current_page == 0
-            # elif isinstance(child, Button) and child.custom_id == "SelectAll":
-            #     child.disabled = False
     
     def update_selects(self):
         for child in self.children:

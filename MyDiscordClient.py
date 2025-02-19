@@ -1,9 +1,15 @@
 import discord
 import time
-from task_db import get_task, replace_task
+from taskDB import get_task, replace_task
 from discord.ext import tasks
-from channels import *
+from api import HOWDY_API
+from collections import defaultdict
+import traceback
 
+channels = {
+    'LOG_CHANNEL': 1338902656890175508,
+    'ALERT_CHANNEL': 1229476856995254342
+}
 class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -12,12 +18,13 @@ class MyClient(discord.Client):
         self.LOG_CHANNEL = None
         
     async def setup_hook(self) -> None:
-        # start the task to run in the background
-        # self.my_background_task.start()
-        pass
+        self.my_background_task.start()
+        # pass
 
     async def on_ready(self):
-        self.LOG_CHANNEL = self.get_channel(LOG_CHANNEL)
+        for channel, channel_id in channels.items():
+            setattr(self, channel, self.get_channel(channel_id))
+
         self.COMMANDS = await self.tree.fetch_commands()
         self.COMMANDS = {command.name: command for command in self.COMMANDS}
 
@@ -47,35 +54,55 @@ class MyClient(discord.Client):
         
         return 0
     
-    # @tasks.loop(seconds=60)  # task runs every 60 seconds
-    # async def my_background_task(self):
-    #     try:
-    #         start = time.time()
-    #         await self.change_presence(status=discord.Status.online, activity=discord.CustomActivity(name='Checking sections...'))
-    #         tasks_all = get_task("ALL")
-    #         alert_channel = self.get_channel(1229476856995254342)
-    #         for obj in terms_object.values():
-    #             obj.refresh_classes()
+    @tasks.loop(seconds=60) 
+    async def my_background_task(self):
+        try:
+            count = 0
+            start = time.time()
+            await self.change_presence(
+                status=discord.Status.online, 
+                activity=discord.CustomActivity(name='Checking sections...')
+                )
+            
+            
+            classes = HOWDY_API.get_availability()
+            users = defaultdict(list)
+            all_tasks = get_task("ALL")
+            for user in all_tasks:
+                for alert in user['tasks']:
+                    count += 1
+                    if not alert['completed'] and classes[alert['terms']][alert['CRN']]:
+                        users[user['user_id']].append(alert)
+                    
+            
+            for user_id, alerts in users.items():
+                user = self.get_user(user_id)
+                embed = discord.Embed(title="Alerts triggered", description=f"", color=discord.Color.green())
+                embed.set_author(name=user.name, icon_url=user.display_avatar.url)
+                message = f"Alerts for {user.mention}:\n"
+                for alert in alerts:
+                    embed.add_field(name=f"{alert['name']} ({alert['CRN']})", value='', inline=False)
+                
+                await self.ALERT_CHANNEL.send(message, embed=embed)
+            
+            for user_id in users:
+                for alert in users[user_id]:
+                    temp = alert.copy()
+                    temp['completed'] = True
+                    replace_task(user_id, alert, temp)
+                    
 
-    #         alert_tasks = []
-    #         for task in tasks_all:
-    #             user = self.get_user(task['user_id'])
-    #             for alert in task['tasks']:
-    #                 if not alert['completed']:
-    #                     term_obj = terms_object[alert['terms']]
-    #                     alert_tasks.append(self.check_availability_and_notify(user, alert, term_obj, task, alert_channel))
+            elapsed = time.time() - start
+            game = discord.CustomActivity(
+                name=f'Just checked {count} sections and notified {len(users)} users in {elapsed:.2f} seconds'
+            )
 
-    #         result = await asyncio.gather(*alert_tasks)
-    #         elapsed = time.time() - start
-    #         game = discord.CustomActivity(
-    #             name=f'Just checked {len(alert_tasks)} sections and notified {sum(result)} users in {elapsed:.2f} seconds'
-    #         )
-    #         await self.change_presence(status=discord.Status.idle, activity=game)
-    #     except Exception as e:
-    #         print(f"Error in my_background_task: {e}")
-    #         os.execv(sys.executable, [sys.executable] + sys.argv)
+            await self.change_presence(status=discord.Status.idle, activity=game)
+        
+        except Exception as e:
+            await self.LOG_CHANNEL.send(f"Error in my_background_task:\n```{traceback.format_exc()}```")
     
 
-    # @my_background_task.before_loop
-    # async def before_my_task(self):
-    #     await self.wait_until_ready()  # wait until the bot logs in
+    @my_background_task.before_loop
+    async def before_my_task(self):
+        await self.wait_until_ready()  # wait until the bot logs in

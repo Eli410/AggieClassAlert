@@ -1,6 +1,6 @@
 from discord import Embed, app_commands
 import discord
-from task_db import write_tasks
+from taskDB import write_tasks
 import datetime
 from discord.ui import View, Button, Select, TextInput, Modal
 from api import HOWDY_API
@@ -57,7 +57,7 @@ class CRNView(View):
                     "icon_url": self.interaction.user.display_avatar.url,
                 },
                 "footer": {
-                    "text": f"{self.term}",
+                    "text": f"{HOWDY_API.term_codes_to_desc[self.term]}",
                 },
             }        
         else:
@@ -120,7 +120,7 @@ class CRNView(View):
         name = f"{self.section['SUBJECT_CODE']} {self.section['COURSE_NUMBER']}-{self.section['SECTION_NUMBER']}"
 
         my_alerts = interaction.client.COMMANDS['my_alerts']
-        if write_tasks(interaction.user.id, [(name, self.term, self.section['CRN'], '>', '0')]):
+        if write_tasks(interaction.user.id, [(name, self.term, self.section['CRN'])]):
             await interaction.response.send_message(content=f"Added {name} to your alert list! Check your alert with </{my_alerts.name}:{my_alerts.id}>", ephemeral=True)
         else:
             await interaction.response.send_message(content=f"Duplicated task! You already have this alert.", ephemeral=True)

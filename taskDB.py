@@ -34,19 +34,16 @@ def write_tasks(user_id, tasks):
         user = {"user_id": user_id, "tasks": []}
         data.append(user)
 
-    for name, term, CRN, comp, value in tasks:
-        task = {"name": name, "terms": term, "CRN": CRN, "comp": comp, "value": value, "completed": False}
+    for name, term, CRN in tasks:
+        task = {"name": name, "terms": term, "CRN": CRN, "completed": False}
         # Check if task already exists
         for existing_task in user["tasks"]:
-            if existing_task["terms"] == term and existing_task["CRN"] == CRN and existing_task["comp"] == comp and existing_task["value"] == value:
+            if existing_task["terms"] == term and existing_task["CRN"] == CRN:
                 if existing_task['completed']:
                     replace_task(user_id, existing_task, task)
                     return True
                 else:
                     return False
-        # is_duplicate = any(existing_task["terms"] == term and existing_task["CRN"] == CRN and 
-                          #  existing_task["comp"] == comp and existing_task["value"] == value
-                          #  for existing_task in user["tasks"])
 
         user["tasks"].append(task)
         

@@ -1,6 +1,6 @@
 from discord import app_commands
 import discord
-from task_db import write_tasks
+from taskDB import write_tasks
 import datetime
 from discord.ui import View, Button, Select
 from api import HOWDY_API
@@ -43,7 +43,7 @@ class SearchView(View):
             term, crn = arg.split('-')
             section_details = await HOWDY_API.get_section_details(term, crn)
             name = f"{section_details['SUBJECT_CODE']} {section_details['COURSE_NUMBER']}-{section_details['SECTION_NUMBER']}"
-            if write_tasks(interaction.user.id, [(name, self.term, crn, '>', '0')]):
+            if write_tasks(interaction.user.id, [(name, self.term, crn)]):
                 success.append(name)
             else:
                 failure.append(name)
@@ -81,26 +81,23 @@ class SearchView(View):
             if i % class_per_page == 0:
                 pages.append(new_embed())
                 selects.append(new_select())
-                in_line = True
 
             lab_field = f"Lab: {meeting_info['Laboratory']}\n" if meeting_info.get('Laboratory') else ""
             pages[-1].add_field(
-                name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
+                name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_CRN']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
                 value=f"Lecture: {meeting_info['Lecture']}\n\
                         {lab_field}\
                         {', '.join([f'[{p[0]}]({p[1]})' if p[1] else f"**{p[0]}**" for p in prof])}\n\
                         [Syllabus](https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=SY&crn_in={cls['SWV_CLASS_SEARCH_CRN']}&termcode_in={cls['SWV_CLASS_SEARCH_TERM']})",
-                inline=in_line)
+                inline=False)
             
             selects[-1].add_option(
                 label=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_TITLE']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
                 value=f"{cls['SWV_CLASS_SEARCH_TERM']}-{cls['SWV_CLASS_SEARCH_CRN']}",
             )
-
-            in_line = not in_line
         
         for i in range(len(pages)):
-            pages[i].set_footer(text=f"{self.term}\n(Page {i+1}/{len(pages)})")
+            pages[i].set_footer(text=f"{HOWDY_API.term_codes_to_desc[self.term]}\n(Page {i+1}/{len(pages)})")
         
         return pages, selects
 
