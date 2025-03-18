@@ -180,7 +180,7 @@ async def term_autocomplete(interaction: discord.Interaction, current: str) -> L
 
 @search_by_instructor.autocomplete("instructor")
 async def instructor_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-    similar = lambda a, b: SequenceMatcher(None, a, b).ratio()
+    similar = lambda a, b: SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
     term = interaction.data["options"][0]["value"]
     matches = sorted(HOWDY_API.get_all_instructors(term), key=lambda instructor: similar(current, instructor), reverse=True)[:10]

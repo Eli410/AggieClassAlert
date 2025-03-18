@@ -57,7 +57,7 @@ def my_alert_embed_select(alert_list, interaction):
         }
 
     
-    sorted_alert_list = sorted(alert_list, key=lambda a: bool(a['completed']))
+    sorted_alert_list = sorted(alert_list or [], key=lambda a: bool(a['completed']))
     current_embed = new_embed()
 
     for alert in sorted_alert_list:
@@ -76,8 +76,9 @@ def my_alert_embed_select(alert_list, interaction):
 
     if not pages:
         embed = new_embed()
+        search_command = interaction.client.COMMANDS['search']
         embed["fields"].append({
-            "name": f"No alerts found, click on </search:{1228160354098610269}> to create one",
+            "name": f"No alerts found, use </{search_command.name}:{search_command.id}> to create one",
             "value": "",
             "inline": "false"
         })

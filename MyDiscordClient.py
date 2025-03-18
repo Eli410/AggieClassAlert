@@ -10,16 +10,16 @@ channels = {
     'LOG_CHANNEL': 1338902656890175508,
     'ALERT_CHANNEL': 1229476856995254342
 }
+
 class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.start_time = int(time.time())
         self.tree = discord.app_commands.CommandTree(self)
-        self.LOG_CHANNEL = None
         
     async def setup_hook(self) -> None:
         self.my_background_task.start()
-        # pass
+        pass
 
     async def on_ready(self):
         for channel, channel_id in channels.items():
@@ -81,7 +81,7 @@ class MyClient(discord.Client):
                 embed.set_author(name=user.name, icon_url=user.display_avatar.url)
                 message = f"Alerts for {user.mention}:\n"
                 for alert in alerts:
-                    embed.add_field(name=f"{alert['name']} ({alert['CRN']})", value='', inline=False)
+                    embed.add_field(name=f"{alert['name']} ({alert['CRN']})", value=f'{HOWDY_API.term_codes_to_desc[alert['terms']]}', inline=False)
                 
                 await self.ALERT_CHANNEL.send(message, embed=embed)
             

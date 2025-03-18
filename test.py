@@ -1,13 +1,3 @@
-from api import get_section_details
-import json
-import asyncio
+from api import HOWDY_API
 
-
-async def main():
-    res = await get_section_details(202511, '12354')
-    with open('class_list.json', 'w') as f:
-        json.dump(res, f, indent=4)
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+print(HOWDY_API.get_classes('202511')[0])

@@ -58,7 +58,8 @@ class Howdy_API:
                         if i['HAS_CV'] == 'Y':
                             CV = f'https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=CV&pidm_in={i['MORE']}'
                         break
-        
+        # grades = self.get_grade_distribution(c['SWV_CLASS_SEARCH_SUBJECT'], c['SWV_CLASS_SEARCH_COURSE'], instructor)
+        # print(grades)
         return out, CV
 
     def filter_by_course(self, term_code, course):
@@ -203,6 +204,34 @@ class Howdy_API:
             out[term['STVTERM_CODE']] = t
 
         return out
+    
+    def get_grade_distribution(self, dept, number, prof=None):
+        url = "https://anex.us/grades/getData/"
+        data = {
+            "dept": dept,
+            "number": number
+        }
+        response = requests.post(url, data=data)
+        print(response.text)
+        print(dept, number, prof)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch grade distribution data from {url}")
+        
+        try:
+            classes = response.json()['classes']
+        except:
+            return []
+
+        if not prof:
+            return classes
+        else:
+            first, last = prof.split(' ')[0], prof.split(' ')[-1]
+            out = []
+            for c in classes:
+                l, f_init = c['prof'].split(' ')[0], c['prof'].split(' ')[1]
+                if l.lower() == last.lower() and f_init[0].lower() == first[0].lower():
+                    out.append(c)
+            return out
 
 
 HOWDY_API = Howdy_API()
@@ -210,6 +239,6 @@ HOWDY_API = Howdy_API()
 if __name__ == '__main__':
     term = '202511'
     crn = '30835'
-    res = asyncio.run(HOWDY_API.get_section_details(term, crn))
+    res = HOWDY_API.classes[term]
     with open('example.json', 'w') as f:
         json.dump(res, f, indent=4)
