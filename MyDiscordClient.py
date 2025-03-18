@@ -32,27 +32,6 @@ class MyClient(discord.Client):
         print(f'Logged in as {self.user} (ID: {self.user.id})')
         print('------')
 
-
-    async def check_availability_and_notify(self, user, alert, term_obj, task, alert_channel):
-        name, terms, CRN, comp, value, completed = alert['name'], alert['terms'], alert['CRN'], alert['comp'], alert['value'], alert['completed']
-        if completed:
-            return 0
-
-        isOpen = await term_obj.get_availability(CRN)
-
-        if isOpen:
-            embed=discord.Embed(title=f"Alert triggered", description=f"{name}", color=discord.Color.green())
-            embed.set_author(name=user.name, icon_url=user.display_avatar.url)
-            embed.set_footer(text=term_obj.display_name)
-
-            await alert_channel.send(f'<@{user.id}> Here is your alert: ', embed=embed)
-                
-            alert['completed'] = True
-            replace_task(task['user_id'], alert, alert)  # Update the task as completed
-
-            return 1
-        
-        return 0
     
     @tasks.loop(seconds=60) 
     async def my_background_task(self):
