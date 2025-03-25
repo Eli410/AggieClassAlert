@@ -37,6 +37,11 @@ class MyClient(discord.Client):
         print(f'Logged in as {self.user} (ID: {self.user.id})')
         print('------')
 
+    async def on_error(self, event_method, /, *args, **kwargs):
+        # Log the error to the ERROR_LOG_CHANNEL
+        error_message = f"Error in {event_method}:\n```{traceback.format_exc()}```"
+        await self.ERROR_LOG_CHANNEL.send(error_message)
+        return await super().on_error(event_method, *args, **kwargs)
     
     @tasks.loop(seconds=60) 
     async def my_background_task(self):
