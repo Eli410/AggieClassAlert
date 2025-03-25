@@ -17,6 +17,7 @@ def get_task(user_id):
         data.append(user)
         with open('tasks.json', 'w') as file:
             json.dump(data, file, indent=4)
+        return user['tasks']
     else:
         return user['tasks']
 

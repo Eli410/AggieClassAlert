@@ -104,9 +104,6 @@ class MyAlertsMain(View):
         self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction)
         self.update_button_state()
 
-    def check_if_it_is_me(self, interaction):
-        return interaction.user == self.interaction.user
-    
     def update_button_state(self):
         for child in self.children:
             if isinstance(child, Button) and child.custom_id == "Next":
@@ -125,8 +122,11 @@ class MyAlertsMain(View):
         self.update_button_state()
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.blurple, custom_id="Prev")
-    @app_commands.check(check_if_it_is_me)
     async def prev(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = max(0, self.current_page - 1)
         self.update_button_state()
         await interaction.response.edit_message(
@@ -135,8 +135,11 @@ class MyAlertsMain(View):
         )
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, custom_id="Next")
-    @app_commands.check(check_if_it_is_me)
     async def next(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = min(len(self.embeds) - 1, self.current_page + 1)
         self.update_button_state()
         await interaction.response.edit_message(
@@ -145,8 +148,11 @@ class MyAlertsMain(View):
         )
 
     @discord.ui.button(label="Edit", style=discord.ButtonStyle.primary, custom_id="Edit", row=2)
-    @app_commands.check(check_if_it_is_me)
     async def edit(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         await self.change_view("edit", interaction, "# Editing Alerts")
         
     async def on_timeout(self):
@@ -220,6 +226,10 @@ class MyAlertsEdit(View):
         return selects
     
     async def selects_callback(self, values=[], interaction=None):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         tasks = {task['name']: task for task in get_task(self.interaction.user.id)}
         for value in values:
             key = value[:-2]
@@ -250,8 +260,11 @@ class MyAlertsEdit(View):
 
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.blurple, custom_id="Prev")
-    @app_commands.check(check_if_it_is_me)
     async def prev(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = max(0, self.current_page - 1)
         self.update_button_state()
         self.update_selects()
@@ -262,8 +275,11 @@ class MyAlertsEdit(View):
         )
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, custom_id="Next")
-    @app_commands.check(check_if_it_is_me)
     async def next(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = min(len(self.embeds) - 1, self.current_page + 1)
         self.update_button_state()
         self.update_selects()
@@ -275,13 +291,19 @@ class MyAlertsEdit(View):
 
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.primary, custom_id="Back", row=2)
-    @app_commands.check(check_if_it_is_me)
     async def back(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         await self.change_view("main", interaction)
 
     @discord.ui.button(label="Delete Selected", style=discord.ButtonStyle.danger, custom_id="Delete Selected", row=2)
-    @app_commands.check(check_if_it_is_me)
     async def delete(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         cnt = 0
         for task in self.selected_alerts.values():
             replace_task(self.interaction.user.id, task, None)
@@ -291,8 +313,11 @@ class MyAlertsEdit(View):
         await self.change_view("edit", interaction, f"{cnt} alerts deleted")
 
     @discord.ui.button(label="Reactivate Selected", style=discord.ButtonStyle.success, custom_id="Reactivate Selected", row=2)
-    @app_commands.check(check_if_it_is_me)
     async def complete(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         cnt = 0
         for task in self.selected_alerts.values():
             new_task = task
@@ -304,8 +329,11 @@ class MyAlertsEdit(View):
         await self.change_view("edit", interaction, f"{cnt} alerts reactivated")
 
     @discord.ui.button(label="Delete All", style=discord.ButtonStyle.danger, custom_id="Delete All", row=3)
-    @app_commands.check(check_if_it_is_me)
     async def delete_all(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         await self.reset()
         await interaction.response.send_modal(ConfirmationModal(interaction, "Delete All Alerts?", on_submit_callback=self.delete_all_alerts))
 

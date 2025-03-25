@@ -5,10 +5,15 @@ from discord.ext import tasks
 from api import HOWDY_API
 from collections import defaultdict
 import traceback
+import json
+import datetime
+from zoneinfo import ZoneInfo
 
 channels = {
-    'LOG_CHANNEL': 1338902656890175508,
-    'ALERT_CHANNEL': 1229476856995254342
+    'ERROR_LOG_CHANNEL': 1338902656890175508,
+    'ALERT_CHANNEL': 1229476856995254342,
+    'AVAILABILITY_LOG_CHANNEL': 1354172503366303825,
+    'ALERT_CREATION_LOG_CHANNEL': 1354176644486791376,
 }
 
 class MyClient(discord.Client):
@@ -77,9 +82,13 @@ class MyClient(discord.Client):
             )
 
             await self.change_presence(status=discord.Status.idle, activity=game)
+
+            with open('log.json', 'w') as file:
+                file.write(json.dumps(classes, indent=4))
+            await self.AVAILABILITY_LOG_CHANNEL.send(file=discord.File('log.json', filename=f"{datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S')}.json"))
         
         except Exception as e:
-            await self.LOG_CHANNEL.send(f"Error in my_background_task:\n```{traceback.format_exc()}```")
+            await self.ERROR_LOG_CHANNEL.send(f"Error in my_background_task:\n```{traceback.format_exc()}```")
     
 
     @my_background_task.before_loop

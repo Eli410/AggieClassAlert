@@ -6,6 +6,7 @@ from discord.ui import View, Button, Select
 from api import HOWDY_API
 from typing import List
 from CustomHelpers import parse_meeting_info, parse_prof
+from zoneinfo import ZoneInfo
 
 class SearchViewSelect(Select):
     def __init__(self, cb):
@@ -38,13 +39,19 @@ class SearchView(View):
         self.update_selects()
         
     async def select_callback(self, values, interaction):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         success, failure = [], []
+        raw = []
         for arg in values:
             term, crn = arg.split('-')
             section_details = await HOWDY_API.get_section_details(term, crn)
             name = f"{section_details['SUBJECT_CODE']} {section_details['COURSE_NUMBER']}-{section_details['SECTION_NUMBER']}"
             if write_tasks(interaction.user.id, [(name, self.term, crn)]):
                 success.append(name)
+                raw.append((name, self.term, crn))
             else:
                 failure.append(name)
         
@@ -54,9 +61,14 @@ class SearchView(View):
         if failure:
             message += f"\nThe following alerts are already in your alert list:\n- {'\n- '.join(failure)}"
         
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send(content=message or "Error", ephemeral=True)
-        
+        await interaction.response.send_message(content=message or "Error", ephemeral=True)
+        log = [{
+                "user_id": interaction.user.id,
+                "time": datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S'),
+                "term": term,
+                "CRN": crn,
+            } for name, term, crn in raw]
+        await interaction.client.ALERT_CREATION_LOG_CHANNEL.send(f"```json\n{log}```")
 
     def get_embeds_and_selects(self):
         class_per_page = 10
@@ -123,6 +135,10 @@ class SearchView(View):
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.blurple, custom_id="Prev")
     async def prev(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = max(0, self.current_page - 1)
         self.update_selects()
         await self.update_embeds()
@@ -134,6 +150,10 @@ class SearchView(View):
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, custom_id="Next")
     async def next(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         self.current_page = min(len(self.embeds) - 1, self.current_page + 1)
         self.update_selects()
         await self.update_embeds()
@@ -145,6 +165,10 @@ class SearchView(View):
 
     @discord.ui.button(label="Select all", style=discord.ButtonStyle.green, custom_id="SelectAll")
     async def select_all(self, interaction, button):
+        if self.interaction.user != interaction.user:
+            command = interaction.client.COMMANDS[self.interaction.command.name]
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            return
         all_values = [option.value for option in self.selects[self.current_page].options]
         await self.select_callback(all_values, interaction)
 

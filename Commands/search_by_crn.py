@@ -5,6 +5,7 @@ import datetime
 from discord.ui import View, Button, Select, TextInput, Modal
 from api import HOWDY_API
 import traceback
+from zoneinfo import ZoneInfo
 
 class CRNSubmissionModal(Modal):
     crn = TextInput(
@@ -28,7 +29,7 @@ class CRNSubmissionModal(Modal):
         
     async def on_error(self, interaction, error):
         trace = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        await interaction.client.LOG_CHANNEL.send(f"Error in CRNSubmissionModal: ```{trace}```")
+        await interaction.client.ERROR_LOG_CHANNEL.send(f"Error in CRNSubmissionModal: ```{trace}```")
         await interaction.response.send_message(content="An error occurred while processing your request.\n(Check if the CRN or term is correct?)", ephemeral=True)
 
 
@@ -112,27 +113,32 @@ class CRNView(View):
 
     @discord.ui.button(label='Add', style=discord.ButtonStyle.blurple, custom_id='Add')
     async def Add(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.interaction.user:
+        if self.interaction.user != interaction.user:
             command = interaction.client.COMMANDS[self.interaction.command.name]
-            await interaction.response.send_message(content=f"This is not your command! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
             return
         
         name = f"{self.section['SUBJECT_CODE']} {self.section['COURSE_NUMBER']}-{self.section['SECTION_NUMBER']}"
 
         my_alerts = interaction.client.COMMANDS['my_alerts']
         if write_tasks(interaction.user.id, [(name, self.term, self.section['CRN'])]):
+            log = {
+                "user_id": interaction.user.id,
+                "time": datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S'),
+                "term": self.term,
+                "CRN": self.section['CRN'],
+            }
+            await interaction.client.ALERT_CREATION_LOG_CHANNEL.send(f"```json\n{log}```")
             await interaction.response.send_message(content=f"Added {name} to your alert list! Check your alert with </{my_alerts.name}:{my_alerts.id}>", ephemeral=True)
         else:
             await interaction.response.send_message(content=f"Duplicated task! You already have this alert.", ephemeral=True)
     
     @discord.ui.button(label='Search', style=discord.ButtonStyle.blurple, custom_id='Search')
-
     async def Search(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.interaction.user:
+        if self.interaction.user != interaction.user:
             command = interaction.client.COMMANDS[self.interaction.command.name]
-            await interaction.response.send_message(content=f"This is not your search! Run the command </{command.name}:{command.id}>", ephemeral=True)
+            await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
             return
-        
         await interaction.response.send_modal(CRNSubmissionModal(interaction, "Search for a course by CRN", self.search_callback, [self.term]))
 
 
