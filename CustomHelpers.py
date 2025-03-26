@@ -38,6 +38,8 @@ def parse_meeting_info(out):
 def parse_prof(str: str):
     out = []
     str = recursive_parse_json(str)
+    if not str:
+        return [('Not assigned', None)]
     for prof in str:
         try:
             name = prof['NAME'].rstrip(' (P)')
