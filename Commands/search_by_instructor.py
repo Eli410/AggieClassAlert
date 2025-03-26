@@ -61,7 +61,11 @@ class SearchInstructorView(View):
         if failure:
             message += f"\nThe following alerts are already in your alert list:\n- {'\n- '.join(failure)}"
         
-        await interaction.response.send_message(content=message or "Error", ephemeral=True)
+        try:
+            await interaction.response.send_message(content=message or "Error", ephemeral=True)
+        except:
+            await interaction.followup.send(content=message or "Error", ephemeral=True)
+            
         log = [{
                 "user_id": interaction.user.id,
                 "time": datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S'),
