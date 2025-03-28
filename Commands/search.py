@@ -210,4 +210,9 @@ async def class_autocomplete(interaction: discord.Interaction, current: str):
             if len(choices) == 10:
                 break
             
-    return choices
+    return choices[:25]
+
+
+@search.error
+async def search_error(interaction: discord.Interaction, error: Exception):
+    await interaction.edit_original_response(content=f"An error occurred:\n```{error}```\nDid you use autocomplete?")

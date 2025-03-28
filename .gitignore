@@ -4,3 +4,4 @@ __pycache__/
 !/format_example/*.json
 env/
 .env
+.venv

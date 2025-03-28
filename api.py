@@ -43,6 +43,8 @@ class Howdy_API:
 
     def get_term_general_info(self, term_code):
         class_list = set()
+        if term_code not in self.classes:
+            return []
         for c in self.classes[term_code]:
             class_list.add((c['SWV_CLASS_SEARCH_SUBJECT'], c['SWV_CLASS_SEARCH_COURSE']))
         return sorted(class_list, key=lambda x: (x[0], x[1]))

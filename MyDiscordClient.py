@@ -8,6 +8,7 @@ import traceback
 import json
 import datetime
 from zoneinfo import ZoneInfo
+import os
 
 channels = {
     'ERROR_LOG_CHANNEL': 1338902656890175508,
@@ -39,8 +40,11 @@ class MyClient(discord.Client):
 
     async def on_error(self, event_method, /, *args, **kwargs):
         # Log the error to the ERROR_LOG_CHANNEL
-        error_message = f"Error in {event_method}:\n```{traceback.format_exc()}```"
-        await self.ERROR_LOG_CHANNEL.send(error_message)
+        error_message = f"Error in {event_method} with args {args} and kwargs {kwargs}"
+        with open('error_log.txt', 'w') as f:
+            f.write(f"{traceback.format_exc()}")
+        await self.ERROR_LOG_CHANNEL.send(error_message, file=discord.File('error_log.txt', filename='error_log.txt'))
+        os.remove('error_log.txt')
         return await super().on_error(event_method, *args, **kwargs)
     
     @tasks.loop(seconds=60) 
@@ -93,7 +97,10 @@ class MyClient(discord.Client):
             await self.AVAILABILITY_LOG_CHANNEL.send(file=discord.File('log.json', filename=f"{datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S')}.json"))
         
         except Exception as e:
-            await self.ERROR_LOG_CHANNEL.send(f"Error in my_background_task:\n```{traceback.format_exc()}```")
+            with open('error_log.txt', 'w') as f:
+                f.write(f"{traceback.format_exc()}")
+            await self.ERROR_LOG_CHANNEL.send(f"An error occurred in the background task: {e} {self.application.owner.mention}", file=discord.File('error_log.txt', filename='error_log.txt'))
+            os.remove('error_log.txt')
     
 
     @my_background_task.before_loop

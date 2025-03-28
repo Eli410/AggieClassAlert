@@ -204,6 +204,5 @@ async def instructor_autocomplete(interaction: discord.Interaction, current: str
     return [app_commands.Choice(name=match, value=match) for match in matches]
 
 @search_by_instructor.error
-async def search_by_instructor_error(interaction: discord.Interaction, error: Exception):
-    await interaction.followup.send(f"An error occurred:\n ```{error}```\nIt is likely that you did not use auto-fill for the arguments.", ephemeral=True)
-    await interaction.client.ERROR_LOG_CHANNEL.send(f"```{error}\n{traceback.format_exc()}```")
+async def search_error(interaction: discord.Interaction, error: Exception):
+    await interaction.edit_original_response(content=f"An error occurred:\n```{error}```\nDid you use autocomplete?")

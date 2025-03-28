@@ -157,3 +157,7 @@ async def term_autocomplete(interaction: discord.Interaction, current: str):
         app_commands.Choice(name=desc, value=code)
         for code, desc in HOWDY_API.term_codes_to_desc.items() if current.lower() in desc.lower()
     ][:25]
+
+@search_by_crn.error
+async def search_error(interaction: discord.Interaction, error: Exception):
+    await interaction.edit_original_response(content=f"An error occurred:\n```{error}```\nDid you use autocomplete?")
