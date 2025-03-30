@@ -63,9 +63,10 @@ class MyClient(discord.Client):
             all_tasks = get_task("ALL")
             for user in all_tasks:
                 for alert in user['tasks']:
-                    count += 1
-                    if not alert['completed'] and classes[alert['terms']][alert['CRN']]:
-                        users[user['user_id']].append(alert)
+                    if not alert['completed']:
+                        count += 1
+                        if classes[alert['terms']][alert['CRN']]:
+                            users[user['user_id']].append(alert)
                     
             
             for user_id, alerts in users.items():

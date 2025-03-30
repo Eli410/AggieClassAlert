@@ -198,11 +198,12 @@ class Howdy_API:
         return out
     
     def get_availability(self):
+        self.classes = {term['STVTERM_CODE']: self.get_classes(term['STVTERM_CODE']) for term in self.terms}
         out = {}
 
         for term in self.terms:
             t = {}
-            for c in self.get_classes(term['STVTERM_CODE']):
+            for c in self.classes[term['STVTERM_CODE']]:
                 t[c['SWV_CLASS_SEARCH_CRN']] = c['STUSEAT_OPEN'] == 'Y'
             
             out[term['STVTERM_CODE']] = t
