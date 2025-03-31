@@ -79,7 +79,7 @@ class MyClient(discord.Client):
                 embed.set_author(name=user.name, icon_url=user.display_avatar.url)
                 message = f"Alerts for {user.mention}:\n"
                 for alert in alerts:
-                    if alert['error']:
+                    if 'error' in alert:
                         user = await self.fetch_user(user_id)
                         await user.send(f'An error occured in your alert, it has been disabled\n```json\n{alert}\n```')
                     else:
@@ -92,7 +92,8 @@ class MyClient(discord.Client):
                 for alert in users[user_id]:
                     temp = alert.copy()
                     temp['completed'] = True
-                    del temp['error']
+                    if 'error' in temp:
+                        del temp['error']
                     replace_task(user_id, alert, temp)
                     
 
