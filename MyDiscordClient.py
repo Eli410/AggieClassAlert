@@ -65,7 +65,11 @@ class MyClient(discord.Client):
                 for alert in user['tasks']:
                     if not alert['completed']:
                         count += 1
-                        if classes[alert['terms']][alert['CRN']]:
+                        try:
+                            if classes[alert['terms']][alert['CRN']]:
+                                users[user['user_id']].append(alert)
+                        except Exception as e:
+                            alert['error'] = e
                             users[user['user_id']].append(alert)
                     
             
@@ -75,14 +79,20 @@ class MyClient(discord.Client):
                 embed.set_author(name=user.name, icon_url=user.display_avatar.url)
                 message = f"Alerts for {user.mention}:\n"
                 for alert in alerts:
-                    embed.add_field(name=f"{alert['name']} ({alert['CRN']})", value=f'{HOWDY_API.term_codes_to_desc[alert['terms']]}', inline=False)
+                    if alert['error']:
+                        user = await self.fetch_user(user_id)
+                        await user.send(f'An error occured in your alert, it has been disabled\n```json\n{alert}\n```')
+                    else:
+                        embed.add_field(name=f"{alert['name']} ({alert['CRN']})", value=f'{HOWDY_API.term_codes_to_desc[alert['terms']]}', inline=False)
                 
-                await self.ALERT_CHANNEL.send(message, embed=embed)
+                if len(embed.fields) > 0:
+                    await self.ALERT_CHANNEL.send(message, embed=embed)
             
             for user_id in users:
                 for alert in users[user_id]:
                     temp = alert.copy()
                     temp['completed'] = True
+                    del temp['error']
                     replace_task(user_id, alert, temp)
                     
 
