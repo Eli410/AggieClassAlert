@@ -118,7 +118,7 @@ class Howdy_API:
                         # Howdy still returns 200 for some reason if the response is invalid kms
                         general_info = await response.json()
                         if not general_info:
-                            error.append(f"Failed to fetch general info from {general_info_link}")
+                            error.append(f"Failed to fetch general info from {general_info_link}, wrong term code or CRN?")
                             return {}
                         else:
                             general_info['COURSE_NAME'] = f"{general_info['DEPT']} {general_info['COURSE_NUMBER']}"
@@ -171,10 +171,13 @@ class Howdy_API:
         # Run the async fetch_all function in the event loop
         out = await fetch_all()
 
-        out.update(out['OTHER_ATTRIBUTES'])
-        del out['OTHER_ATTRIBUTES']
-        out.update(out['Meeting times with profs'])
-        del out['Meeting times with profs']
+        if 'OTHER_ATTRIBUTES' in out:
+            out.update(out['OTHER_ATTRIBUTES'])
+            del out['OTHER_ATTRIBUTES']
+
+        if 'Meeting times with profs' in out:
+            out.update(out['Meeting times with profs'])
+            del out['Meeting times with profs']
 
         # Parse SWV_CLASS_SEARCH_JSON_CLOB into a readable message
         if "SWV_CLASS_SEARCH_JSON_CLOB" in out and isinstance(out["SWV_CLASS_SEARCH_JSON_CLOB"], list):
@@ -241,9 +244,13 @@ class Howdy_API:
 
 HOWDY_API = Howdy_API()
 
-if __name__ == '__main__':
+
+async def test():
     term = '202511'
-    crn = '30835'
-    res = HOWDY_API.classes[term]
-    with open('example.json', 'w') as f:
-        json.dump(res, f, indent=4)
+    crn = '45405'
+    res = await HOWDY_API.get_section_details(term, crn)
+    print(res)
+
+if __name__ == '__main__':
+    asyncio.run(test())
+
