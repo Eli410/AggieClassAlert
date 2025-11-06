@@ -38,6 +38,10 @@ class SearchView(View):
         self.update_button()
         self.update_selects()
         
+    async def on_timeout(self):
+        await self.interaction.edit_original_response(content="# Message timed out", view=None)
+
+
     async def select_callback(self, values, interaction):
         if self.interaction.user != interaction.user:
             command = interaction.client.COMMANDS[self.interaction.command.name]
@@ -62,9 +66,9 @@ class SearchView(View):
             message += f"\nThe following alerts are already in your alert list:\n- {'\n- '.join(failure)}"
         
         try:
-            await interaction.response.send_message(content=message or "Error", ephemeral=True)
+            await self.interaction.response.send_message(content=message or "Error", ephemeral=True)
         except:
-            await interaction.followup.send(content=message or "Error", ephemeral=True)
+            await self.interaction.followup.send(content=message or "Error", ephemeral=True)
             
         log = [{
                 "user_id": interaction.user.id,
@@ -174,6 +178,7 @@ class SearchView(View):
             await interaction.response.send_message(content=f"This is not your embed! Run the command </{command.name}:{command.id}>", ephemeral=True)
             return
         all_values = [option.value for option in self.selects[self.current_page].options]
+        await interaction.response.defer()
         await self.select_callback(all_values, interaction)
 
 
@@ -197,6 +202,7 @@ async def term_autocomplete(
 
 @search.autocomplete('course')
 async def class_autocomplete(interaction: discord.Interaction, current: str):
+    seen = set()
     if not current:
         return []
     current = current.strip()
@@ -205,8 +211,9 @@ async def class_autocomplete(interaction: discord.Interaction, current: str):
     choices = []
     for cls in classes:
         candidate = f"{cls[0]} {cls[1]}"
-        if current.lower() in candidate.lower():
+        if candidate not in seen and current.lower() in candidate.lower():
             choices.append(app_commands.Choice(name=candidate, value=candidate))
+            seen.add(candidate)
             if len(choices) == 10:
                 break
             

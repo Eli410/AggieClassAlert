@@ -38,6 +38,9 @@ class SearchInstructorView(View):
         self.update_button()
         self.update_selects()
 
+    async def on_timeout(self):
+        await self.interaction.edit_original_response(content="# Message timed out", view=None)
+
     async def select_callback(self, values, interaction):
         if self.interaction.user != interaction.user:
             command = interaction.client.COMMANDS[self.interaction.command.name]

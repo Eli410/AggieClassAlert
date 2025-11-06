@@ -27,6 +27,7 @@ def new_embed(client: discord.Client):
             {"name": "Latency", "value": f"{client.latency * 1000:.1f} ms", "inline": False},
             {"name": "Online Since", "value": f"<t:{client.start_time}:R>", "inline": False},
             {"name": "Active Alerts", "value": f"{sum(1 for user in get_task('ALL') for task in user['tasks'] if not task['completed'])}", "inline": False},
+            {"name": "Users with Alerts", "value": f"{len(get_task('ALL'))}", "inline": False},
         ],
     })
 

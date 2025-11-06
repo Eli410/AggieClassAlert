@@ -2,3 +2,4 @@ discord.py
 Requests
 python-dotenv 
 tzdata
+matplotlib

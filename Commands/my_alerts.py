@@ -40,18 +40,18 @@ class MyAlertsSelect(Select):
     async def callback(self, interaction):
         await self.cb(self.values, interaction)
 
-def my_alert_embed_select(alert_list, interaction):
+def my_alert_embed_select(alert_list, interaction, user):
     alerts_per_page = 10
     pages = []
     def new_embed():
         return {
-            "title": "Your Alerts",
+            "title": f"{user.display_name}'s Alerts",
             "description": f"{len(alert_list)} alerts ({len([a for a in alert_list if not bool(a['completed'])])} active alerts)",
             "color": 0x580404,
             "timestamp": datetime.datetime.now().isoformat(),
             "author": {
-                "name": interaction.user.display_name,
-                "icon_url": interaction.user.display_avatar.url,
+                "name": user.display_name,
+                "icon_url": user.display_avatar.url,
             },
             "fields": [],
         }
@@ -95,13 +95,14 @@ def my_alert_embed_select(alert_list, interaction):
     
 
 class MyAlertsMain(View):
-    def __init__(self, interaction, change_view, can_edit):
+    def __init__(self, interaction, change_view, can_edit, user):
         super().__init__()
         self.interaction = interaction
         self.change_view = change_view
         self.can_edit = can_edit
         self.current_page = 0
-        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction)
+        self.user = user
+        self.embeds = my_alert_embed_select(get_task(self.user.id), self.interaction, self.user)
         self.update_button_state()
 
     def update_button_state(self):
@@ -112,13 +113,13 @@ class MyAlertsMain(View):
                 child.disabled = self.current_page == 0
             elif isinstance(child, Button) and child.custom_id == "Edit":
                 if self.can_edit:
-                    child.disabled = not get_task(self.interaction.user.id)
+                    child.disabled = not get_task(self.user.id)
                 else:
                     self.remove_item(child)
 
     async def reset(self):
         self.current_page = 0
-        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction)
+        self.embeds = my_alert_embed_select(get_task(self.user.id), self.interaction, self.user)
         self.update_button_state()
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.blurple, custom_id="Prev")
@@ -156,11 +157,8 @@ class MyAlertsMain(View):
         await self.change_view("edit", interaction, "# Editing Alerts")
         
     async def on_timeout(self):
-        for child in self.children:
-            if isinstance(child, Button) or isinstance(child, Select):
-                child.disabled = True
+        await self.interaction.edit_original_response(content="# Message timed out", view=None)
 
-        await self.change_view("main", self.interaction, "Message timed out")
 
 class MyAlertsEdit(View):
     def __init__(self, interaction, change_view):
@@ -169,14 +167,11 @@ class MyAlertsEdit(View):
         self.change_view = change_view
         self.current_page = 0
         self.selected_alerts = {}
-        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction)
+        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction, self.interaction.user)
         self.selects = self.get_selects()
         self.update_button_state()
         self.update_selects()
-        
-    def check_if_it_is_me(self, interaction):
-        return interaction.user == self.interaction.user
-    
+
     async def delete_all_alerts(self, interaction):
         tasks=get_task(self.interaction.user.id)
         for task in tasks:
@@ -251,7 +246,7 @@ class MyAlertsEdit(View):
 
     async def reset(self):
         self.current_page = 0
-        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction)
+        self.embeds = my_alert_embed_select(get_task(self.interaction.user.id), self.interaction, self.interaction.user)
         self.update_button_state()
         self.update_selects()
         self.selected_alerts = {}
@@ -348,16 +343,16 @@ class MyAlertsView():
     def __init__(self, interaction, user = None):
         self.interaction = interaction
         self.user = user or interaction.user
-        self.can_edit = (interaction.user == self.user)
+        self.can_edit = interaction.user.id == user.id
         self.views = {}
         self.view = None
         self.initialise_views()
             
     
     def initialise_views(self):
-        if self.user:
-            self.interaction.user = self.user
-        self.views["main"] = MyAlertsMain(self.interaction, self.change_view, can_edit = self.can_edit)
+        # if self.user:
+        #     self.interaction.user = self.user
+        self.views["main"] = MyAlertsMain(self.interaction, self.change_view, can_edit = self.can_edit, user = self.user)
         self.views["edit"] = MyAlertsEdit(self.interaction, self.change_view)
         self.view = self.views["main"]
     
@@ -375,7 +370,7 @@ View and manage your alerts.
 
 @app_commands.command(name='my_alerts', description=description)
 async def my_alerts(interaction: discord.Interaction, user: discord.Member = None):
-    my_alerts_page = MyAlertsView(interaction, user)
+    my_alerts_page = MyAlertsView(interaction, user or interaction.user)
     await interaction.response.defer()
     await my_alerts_page.change_view("main", interaction)
     
