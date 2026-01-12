@@ -36,7 +36,7 @@ class MyClient(discord.Client):
         self.tree = discord.app_commands.CommandTree(self)
         
     async def setup_hook(self) -> None:
-        # self.my_background_task.start()
+        self.my_background_task.start()
         pass
 
     async def on_ready(self):
