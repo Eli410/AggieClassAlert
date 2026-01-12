@@ -197,6 +197,22 @@ class Howdy_API:
             
         return out
     
+    async def get_syllabus(self, term_code: str, crn: str):
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(
+                    'https://howdyportal.tamu.edu/api/course-syllabus-pdf',
+                    params={'termCode': term_code, 'crn': crn},
+                    timeout=5
+                ) as response:
+                    if response.status == 200:
+                        return await response.read()
+                    else:
+                        return None
+            except Exception as e:
+                print(f"Failed to fetch syllabus: {e}")
+                return None
+            
     def get_availability(self):
         self.classes = {term['STVTERM_CODE']: self.get_classes(term['STVTERM_CODE']) for term in self.terms}
         out = {}

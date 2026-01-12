@@ -1,3 +1,10 @@
+import asyncio
 from api import HOWDY_API
 
-print(HOWDY_API.get_classes('202511')[0])
+async def main():
+    details = await HOWDY_API.get_syllabus('202611', '27369')
+    with open('syllabus.pdf', 'wb') as f:
+        f.write(details)
+
+if __name__ == "__main__":
+    asyncio.run(main())

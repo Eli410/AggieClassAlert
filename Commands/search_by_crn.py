@@ -6,6 +6,8 @@ from discord.ui import View, Button, Label, TextInput, Modal, Select
 from api import HOWDY_API
 import traceback
 from zoneinfo import ZoneInfo
+import io
+
 
 class CRNSubmissionModal(Modal):
     term = Label(
@@ -27,7 +29,7 @@ class CRNSubmissionModal(Modal):
         self.on_submit_callback = on_submit_callback
         self.on_submit_callback_args = on_submit_callback_args
 
-    def get_embed(self):
+    def get_embed(self, syllabus_url):
         embed = {
             "title": f"{self.section['COURSE_TITLE']}\n{self.section['COURSE_NAME']}-{self.section['SECTION_NUMBER']} ({self.section['CRN']})",
             "description": f"{self.section['COURSE_DESCRIPTION']}\n",
@@ -44,7 +46,7 @@ class CRNSubmissionModal(Modal):
                 },
                 {
                     "name": "Syllabus",
-                    "value": f"[link]({self.section['SYLLABUS']})",
+                    "value": f"[link]({syllabus_url})" if syllabus_url else "Not available",
                     "inline": True,
                 },
             ],
@@ -64,12 +66,17 @@ class CRNSubmissionModal(Modal):
     async def on_submit(self, interaction):
         term = self.term.component.values[0]
         crn = self.crn.value
+        syllabus = await HOWDY_API.get_syllabus(term, crn)
+        fp = io.BytesIO(syllabus)
+        fp.seek(0)
+        syllabus = await self.interaction.client.SYLLABUS_CHANNEL.send(file=discord.File(fp, filename=f"Syllabus_{crn}.pdf"))
+        syllabus_url = syllabus.attachments[0].url
         print(f"Searching for CRN {crn} in term {term}")
         self.section = await HOWDY_API.get_section_details(term, crn)
         if not self.section:
             await interaction.response.send_message(content=f"# Invalid CRN for {term}!", ephemeral=True)
             return
-        self.embed = self.get_embed()
+        self.embed = self.get_embed(syllabus_url)
         view = CRNView(self.interaction, self)
         await interaction.response.send_message(embed=self.embed, view=view)
 
