@@ -43,10 +43,10 @@ def parse_prof(str: str):
     for prof in str:
         try:
             name = prof['NAME'].rstrip(' (P)')
-            if prof['HAS_CV'] == 'Y':
-                cv = f'https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=CV&pidm_in={prof["MORE"]}'
-            else:
-                cv = None
+            # if prof['HAS_CV'] == 'Y':
+            #     cv = f'https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=CV&pidm_in={prof["MORE"]}'
+            # else:
+            cv = None
             out.append((name, cv))
         except KeyError:
             out.append(('Not assigned', None))

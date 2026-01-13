@@ -107,8 +107,7 @@ class SearchView(View):
                 name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_CRN']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
                 value=f"{'Lecture: ' + meeting_info['Lecture'] + '\n' if 'Lecture' in meeting_info else ''}\
                         {lab_field}\
-                        {', '.join([f'[{p[0]}]({p[1]})' if p[1] else f"**{p[0]}**" for p in prof])}\n\
-                        [Syllabus](https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=SY&crn_in={cls['SWV_CLASS_SEARCH_CRN']}&termcode_in={cls['SWV_CLASS_SEARCH_TERM']})",
+                        {', '.join([f'[{p[0]}]({p[1]})' if p[1] else f"**{p[0]}**" for p in prof])}",
                 inline=False)
             
             selects[-1].add_option(

@@ -34,6 +34,7 @@ class SearchInstructorView(View):
         self.section = None
         self.current_page = 0
         self.class_list, self.CV = HOWDY_API.filter_by_instructor(term, instructor)
+        self.CV = None
         self.embeds, self.selects = self.get_embeds_and_selects()
         self.update_button()
         self.update_selects()
@@ -194,8 +195,7 @@ async def search_by_instructor(interaction: discord.Interaction, term: str, inst
 async def term_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:    
     return [
         app_commands.Choice(name=desc, value=code)
-        for code, desc in HOWDY_API.term_codes_to_desc.items()
-        if current.lower() in desc.lower()
+        for code, desc in HOWDY_API.term_codes_to_desc.items() if current.lower() in desc.lower()
     ][:25]
 
 @search_by_instructor.autocomplete("instructor")

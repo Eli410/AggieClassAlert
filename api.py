@@ -162,7 +162,7 @@ class Howdy_API:
                     if out["OTHER_ATTRIBUTES"]['Meeting times with profs'] and out['OTHER_ATTRIBUTES']['Meeting times with profs']['SWV_CLASS_SEARCH_INSTRCTR_JSON']:
                         instructor_info = out["OTHER_ATTRIBUTES"]['Meeting times with profs']['SWV_CLASS_SEARCH_INSTRCTR_JSON'][0]
                         out['INSTRUCTOR'] = instructor_info['NAME'].rstrip(' (P)')
-                        instructor_info['CV'] = f'https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=CV&pidm_in={instructor_info['MORE']}'
+                        # instructor_info['CV'] = f'https://compass-ssb.tamu.edu/pls/PROD/bwykfupd.p_showdoc?doctype_in=CV&pidm_in={instructor_info['MORE']}'
                     else:
                         out['INSTRUCTOR'] = 'Not assigned'
                     
@@ -213,6 +213,20 @@ class Howdy_API:
                 print(f"Failed to fetch syllabus: {e}")
                 return None
             
+    async def get_instructor_cv(self, code):
+        cv_url = f'https://howdyportal.tamu.edu/api/instructor-cv-pdf?instructorPidm={code}'
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(cv_url, timeout=5) as response:
+                    if response.status == 200:
+                        return await response.read()
+                    else:
+                        return None
+            except Exception as e:
+                print(f"Failed to fetch instructor CV: {e}")
+                return None
+
+
     def get_availability(self):
         self.classes = {term['STVTERM_CODE']: self.get_classes(term['STVTERM_CODE']) for term in self.terms}
         out = {}
