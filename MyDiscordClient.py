@@ -15,6 +15,7 @@ import sys
 import ast
 from dotenv import load_dotenv
 import aiohttp
+from Events.on_message import on_message as on_message_handler
 
 
 load_dotenv()
@@ -60,74 +61,7 @@ class MyClient(discord.Client):
         return await super().on_error(event_method, *args, **kwargs)
     
     async def on_message(self, message: discord.Message):
-        if '@everyone' in message.content and not message.author.guild_permissions.administrator:
-            await message.delete()
-            return
-
-        if message.author == self.user:
-            return
-        if message.channel.id != self.LINK_CHANNEL.id:
-            return
-        if '```json' not in message.content:
-            return
-        
-        json_data = message.content.replace('```json', '').replace('```', '').strip()
-        try:
-            data = json.loads(json_data)
-        except json.JSONDecodeError as e:
-            await message.channel.send(f"Invalid JSON format: {e}")
-            return
-
-            
-        if 'field' in data:
-            operation = data['field']
-            val = data['value']
-            term, crn, disabled = val['term'], val['CRN'], val.get('disabled', False)
-            section_details = await HOWDY_API.get_section_details(term, crn)
-            name = f"{section_details['SUBJECT_CODE']} {section_details['COURSE_NUMBER']}-{section_details['SECTION_NUMBER']}"
-
-            if operation == 'Post':
-                if write_tasks(int(val['user_id']), [(name, term, crn, disabled)]):
-                    await self.LINK_CHANNEL.send((operation, name, term, crn, val['time'], True))
-                else:
-                    await self.LINK_CHANNEL.send((operation, name, term, crn, val['time'], False))
-            elif operation == 'Delete':
-                replace_task(int(val['user_id']), {'name': name, 'terms': term, 'CRN': crn}, None)
-                await self.LINK_CHANNEL.send((operation, name, term, crn, val['time'], True))
-        else:
-            # link
-            email, tup, discord_id, sync_id = data.values()
-            raw = []
-            for crn, term in tup:
-                section_details = await HOWDY_API.get_section_details(term, crn)
-                name = f"{section_details['SUBJECT_CODE']} {section_details['COURSE_NUMBER']}-{section_details['SECTION_NUMBER']}"
-                if write_tasks(int(discord_id), [(name, term, crn)]):
-                    raw.append((name, term, crn, True))
-                else:
-                    raw.append((name, term, crn, False))
-            await self.LINK_CHANNEL.send(f"Linked <@{discord_id}> ({email}) with {len(raw)} classes ({sum(1 for _, _, _, success in raw if success)} successful) from the website.\n- {'\n- '.join(f'{name} ({term}, {crn})' for name, term, crn, success in raw)}")
-
-            user_tasks = get_task(int(discord_id))
-            header = {
-                "X-AUTH-TOKEN": os.getenv('WEB_LINK_TOKEN'),
-                "Content-Type": "application/json",
-            }
-            payload = {
-                'email': email,
-                'sync_id': sync_id,
-                'list': [[task['CRN'], task['terms']] for task in user_tasks]
-            }
-            url = os.getenv('WEB_LINK_URL')
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=header, json=payload) as response:
-                    response_text = await response.text()
-                    
-                    if response.status == 200:
-                        await self.LINK_CHANNEL.send(f"Successfully sent {len(user_tasks)} tasks for <@{discord_id}> ({email}) to website.")
-                    else:
-                        await self.LINK_CHANNEL.send(f"Failed to send tasks for <@{discord_id}> ({email}) to website. Status code: {response.status}")
-                        await self.LINK_CHANNEL.send(f"Error data: {response_text}")
+        await on_message_handler(self, message)
 
 
     @tasks.loop(seconds=60) 

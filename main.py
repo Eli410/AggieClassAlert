@@ -9,12 +9,15 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content=True
 
-client = MyClient(intents=intents, 
-                  allowed_mentions=discord.AllowedMentions(everyone=False, 
-                                                           users=True, 
-                                                           roles=True, 
-                                                           replied_user=True),
-                  )
+client = MyClient(
+    intents=intents, 
+    allowed_mentions=discord.AllowedMentions(
+        everyone=False, 
+        users=True, 
+        roles=True, 
+        replied_user=True
+    ),
+)
 
 
 for command in COMMANDS:
