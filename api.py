@@ -6,7 +6,28 @@ import aiohttp
 import asyncio
 import json
 import datetime
-from CustomHelpers import recursive_parse_json
+
+
+def recursive_parse_json(value):
+    """
+    Recursively parse JSON-encoded strings within nested structures.
+    - If given a JSON string, it will be decoded (and any nested JSON strings inside
+      the resulting dicts/lists will also be decoded).
+    - Dicts and lists are traversed recursively.
+    - Non-string, non-container values are returned as-is.
+    """
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return value
+        return recursive_parse_json(parsed)
+    elif isinstance(value, dict):
+        return {k: recursive_parse_json(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [recursive_parse_json(item) for item in value]
+    else:
+        return value
 
 SEMESTERS = [
              'Spring 2026',
