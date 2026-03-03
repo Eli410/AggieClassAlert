@@ -31,14 +31,17 @@ channels = {
 }
 
 class MyClient(discord.Client):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, dev_mode: bool = False, **kwargs):
+        self.dev_mode = dev_mode
         super().__init__(*args, **kwargs)
         self.start_time = int(time.time())
         self.tree = discord.app_commands.CommandTree(self)
         
     async def setup_hook(self) -> None:
-        self.my_background_task.start()
-        pass
+        if not getattr(self, "dev_mode", False):
+            self.my_background_task.start()
+        else:
+            print("Dev mode enabled: background task disabled.")
 
     async def on_ready(self):
         for channel, channel_id in channels.items():
