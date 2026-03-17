@@ -1,7 +1,6 @@
 import discord
-from discord.ext import commands
 import time
-from taskDB import get_task, replace_task, write_tasks
+from taskDB import get_task, replace_task
 from discord.ext import tasks
 from api import HOWDY_API
 from collections import defaultdict
@@ -11,10 +10,7 @@ import datetime
 from zoneinfo import ZoneInfo
 import os
 from userSettings import USER_PREFERENCES
-import sys
-import ast
 from dotenv import load_dotenv
-import aiohttp
 from Events.on_message import on_message as on_message_handler
 
 

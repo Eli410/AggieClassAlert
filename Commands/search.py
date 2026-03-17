@@ -2,23 +2,65 @@ from discord import app_commands
 import discord
 from taskDB import write_tasks
 import datetime
+import json
 from discord.ui import View, Button, Select
 from api import HOWDY_API
-from typing import List
-from CustomHelpers import parse_meeting_info, parse_prof
+from typing import List, Optional
+from CustomHelpers import parse_prof
 from zoneinfo import ZoneInfo
+
+
+def _parse_clob(clob):
+    while isinstance(clob, str):
+        clob = json.loads(clob)
+    return clob
+
+def _get_prof_names(instrctr_json):
+    if not instrctr_json:
+        return []
+    instructors = _parse_clob(instrctr_json)
+    return [prof['NAME'].rstrip(' (P)') for prof in instructors if 'NAME' in prof]
+
+def parse_meeting_info(json_clob):
+    meetings = _parse_clob(json_clob)
+
+    def fmt_time(t):
+        if not t:
+            return 'N/A'
+        hour, rest = t.split(':', 1)
+        minutes, period = rest.split()
+        hour = str(int(hour))
+        period = period.lower()
+        return f"{hour} {period}" if minutes == '00' else f"{hour}:{minutes} {period}"
+
+    result = {}
+    for meeting in meetings:
+        days = [meeting[d] for d in [
+            "SSRMEET_SUN_DAY", "SSRMEET_MON_DAY", "SSRMEET_TUE_DAY",
+            "SSRMEET_WED_DAY", "SSRMEET_THU_DAY", "SSRMEET_FRI_DAY",
+            "SSRMEET_SAT_DAY"
+        ] if meeting.get(d)]
+        day_str = "".join(days) if days else "N/A"
+        begin = fmt_time(meeting.get('SSRMEET_BEGIN_TIME'))
+        end   = fmt_time(meeting.get('SSRMEET_END_TIME'))
+        bldg  = meeting.get('SSRMEET_BLDG_CODE', 'N/A')
+        room  = meeting.get('SSRMEET_ROOM_CODE', 'N/A')
+        mtyp  = meeting.get('SSRMEET_MTYP_CODE', 'N/A')
+        result[mtyp] = f"{day_str} {begin} - {end} at {bldg} {room}"
+    return result
+
 
 class SearchViewSelect(Select):
     def __init__(self, cb):
         super().__init__(
-            placeholder="Select a section", 
-            )
+            placeholder="Select a section",
+        )   
         self.cb = cb
-    
+
     def add_option(self, *, label, value = ..., description = None, emoji = None, default = False):
         super().add_option(label=label, value=value, description=description, emoji=emoji, default=default)
         self.max_values = len(self.options)
-    
+
 
     async def callback(self, interaction):
         await self.cb(self.values, interaction)
@@ -26,7 +68,7 @@ class SearchViewSelect(Select):
 
 
 class SearchView(View):
-    def __init__(self, interaction: discord.Interaction, term, course):
+    def __init__(self, interaction: discord.Interaction, term, course, professor=None):
         super().__init__()
         self.term = term
         self.course = course
@@ -34,10 +76,15 @@ class SearchView(View):
         self.section = None
         self.current_page = 0
         self.class_list = HOWDY_API.filter_by_course(term, course)
+        if professor:
+            self.class_list = [
+                cls for cls in self.class_list
+                if professor in _get_prof_names(cls['SWV_CLASS_SEARCH_INSTRCTR_JSON'])
+            ]
         self.embeds, self.selects = self.get_embeds_and_selects()
         self.update_button()
         self.update_selects()
-        
+
     async def on_timeout(self):
         await self.interaction.edit_original_response(content="# Message timed out", view=None)
 
@@ -58,18 +105,15 @@ class SearchView(View):
                 raw.append((name, self.term, crn))
             else:
                 failure.append(name)
-        
+
         message = ""
         if success:
             message += f"Added the following sections to your watchlist:\n- {'\n- '.join(success)}"
         if failure:
             message += f"\nThe following alerts are already in your alert list:\n- {'\n- '.join(failure)}"
-        
-        try:
-            await self.interaction.response.send_message(content=message or "Error", ephemeral=True)
-        except:
-            await self.interaction.followup.send(content=message or "Error", ephemeral=True)
-            
+
+        await interaction.response.send_message(content=message or "Error", ephemeral=True)
+
         log = [{
                 "user_id": interaction.user.id,
                 "time": datetime.datetime.now(ZoneInfo('US/Central')).strftime('%Y-%m-%d %H:%M:%S'),
@@ -80,8 +124,13 @@ class SearchView(View):
 
     def get_embeds_and_selects(self):
         class_per_page = 10
+        base_title = next(
+            (c['SWV_CLASS_SEARCH_TITLE'] for c in self.class_list
+             if not c['SWV_CLASS_SEARCH_TITLE'].startswith('HNR-')),
+            self.class_list[0]['SWV_CLASS_SEARCH_TITLE'].removeprefix('HNR-') if self.class_list else ''
+        )
         new_embed = lambda: discord.Embed.from_dict({
-            "description": f"**Search results for {self.course} ({cls['SWV_CLASS_SEARCH_TITLE']})**\n({len(self.class_list)} results)",
+            "description": f"**Search results for {self.course} ({base_title})**\n({len(self.class_list)} results)",
             "color": 0x580404,
             "timestamp": datetime.datetime.now().isoformat(),
             "author": {
@@ -93,31 +142,35 @@ class SearchView(View):
 
         pages = []
         selects = []
-        
+
         for i in range(len(self.class_list)):
             cls = self.class_list[i]
             meeting_info = parse_meeting_info(cls['SWV_CLASS_SEARCH_JSON_CLOB'])
             prof = parse_prof(cls['SWV_CLASS_SEARCH_INSTRCTR_JSON'])
+            is_honors = cls['SWV_CLASS_SEARCH_TITLE'].startswith('HNR-')
             if i % class_per_page == 0:
                 pages.append(new_embed())
                 selects.append(new_select())
 
-            lab_field = f"Lab: {meeting_info['Laboratory']}\n" if meeting_info.get('Laboratory') else ""
-            pages[-1].add_field(
-                name=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_CRN']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
-                value=f"{'Lecture: ' + meeting_info['Lecture'] + '\n' if 'Lecture' in meeting_info else ''}\
-                        {lab_field}\
-                        {', '.join([f'[{p[0]}]({p[1]})' if p[1] else f"**{p[0]}**" for p in prof])}",
-                inline=False)
-            
-            selects[-1].add_option(
-                label=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_TITLE']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
-                value=f"{cls['SWV_CLASS_SEARCH_TERM']}-{cls['SWV_CLASS_SEARCH_CRN']}",
+            TYPE_ABBREV = {'Lecture': 'Lec', 'Laboratory': 'Lab', 'Recitation': 'Rec'}
+            meeting_lines = "\n".join(
+                f"{TYPE_ABBREV.get(mtyp, mtyp)}: {info}"
+                for mtyp, info in meeting_info.items()
             )
-        
+            pages[-1].add_field(
+                name=f"{'🇭 ' if is_honors else ''}{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_CRN']}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
+                value=f"{meeting_lines}\n{', '.join([f'[{p[0]}]({p[1]})' if p[1] else f'**{p[0]}**' for p in prof])}",
+                inline=False)
+
+            selects[-1].add_option(
+                label=f"{cls['SWV_CLASS_SEARCH_SUBJECT']}-{cls['SWV_CLASS_SEARCH_COURSE']}-{cls['SWV_CLASS_SEARCH_SECTION']} ({cls['SWV_CLASS_SEARCH_TITLE'].removeprefix('HNR-')}) {'🟢' if cls['STUSEAT_OPEN'] == 'Y' else '🔴'}",
+                value=f"{cls['SWV_CLASS_SEARCH_TERM']}-{cls['SWV_CLASS_SEARCH_CRN']}",
+                emoji='🇭' if is_honors else None,
+            )
+
         for i in range(len(pages)):
             pages[i].set_footer(text=f"{HOWDY_API.term_codes_to_desc[self.term]}\n(Page {i+1}/{len(pages)})")
-        
+
         return pages, selects
 
 
@@ -135,7 +188,7 @@ class SearchView(View):
 
         if self.selects:
             self.add_item(self.selects[self.current_page])
-        
+
     async def update_embeds(self):
         if self.embeds:
             await self.interaction.edit_original_response(embed = self.embeds[self.current_page], view=self)
@@ -151,7 +204,7 @@ class SearchView(View):
         await self.update_embeds()
         self.update_button()
         await interaction.response.edit_message(
-            embed=self.embeds[self.current_page], 
+            embed=self.embeds[self.current_page],
             view=self,
         )
 
@@ -166,7 +219,7 @@ class SearchView(View):
         await self.update_embeds()
         self.update_button()
         await interaction.response.edit_message(
-            embed=self.embeds[self.current_page], 
+            embed=self.embeds[self.current_page],
             view=self,
         )
 
@@ -183,11 +236,12 @@ class SearchView(View):
 
 
 @app_commands.command(name='search')
-async def search(interaction: discord.Interaction, term: str, course: str):
+async def search(interaction: discord.Interaction, term: str, course: str, professor: Optional[str] = None):
     await interaction.response.defer(ephemeral=False, thinking=True)
-    view = SearchView(interaction, term, course)
+    course = course.strip().upper()
+    view = SearchView(interaction, term, course, professor)
     await interaction.edit_original_response(view=view, embed=view.embeds[0])
-    
+
 
 @search.autocomplete('term')
 async def term_autocomplete(
@@ -198,6 +252,26 @@ async def term_autocomplete(
         app_commands.Choice(name=desc, value=code)
         for code, desc in HOWDY_API.term_codes_to_desc.items() if current.lower() in desc.lower()
     ][:25]
+
+@search.autocomplete('professor')
+async def professor_autocomplete(interaction: discord.Interaction, current: str):
+    options = {opt['name']: opt.get('value', '') for opt in interaction.data.get('options', [])}
+    term = options.get('term', '')
+    course = options.get('course', '').strip().upper()
+    if not term or not course:
+        return []
+    try:
+        classes = HOWDY_API.filter_by_course(term, course)
+    except Exception:
+        return []
+    seen = set()
+    choices = []
+    for cls in classes:
+        for name in _get_prof_names(cls['SWV_CLASS_SEARCH_INSTRCTR_JSON']):
+            if name not in seen and current.lower() in name.lower():
+                seen.add(name)
+                choices.append(app_commands.Choice(name=name, value=name))
+    return choices[:25]
 
 @search.autocomplete('course')
 async def class_autocomplete(interaction: discord.Interaction, current: str):
@@ -215,7 +289,7 @@ async def class_autocomplete(interaction: discord.Interaction, current: str):
             seen.add(candidate)
             if len(choices) == 10:
                 break
-            
+
     return choices[:25]
 
 

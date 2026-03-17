@@ -30,7 +30,7 @@ def recursive_parse_json(value):
         return value
 
 SEMESTERS = [
-             'Spring 2026',
+             'Fall 2026',
              ]
 
 class Howdy_API:
@@ -192,10 +192,12 @@ class Howdy_API:
         # Run the async fetch_all function in the event loop
         out = await fetch_all()
 
-        out.update(out['OTHER_ATTRIBUTES'])
-        del out['OTHER_ATTRIBUTES']
-        out.update(out['Meeting times with profs'])
-        del out['Meeting times with profs']
+        if 'OTHER_ATTRIBUTES' in out:
+            out.update(out['OTHER_ATTRIBUTES'])
+            del out['OTHER_ATTRIBUTES']
+        if 'Meeting times with profs' in out:
+            out.update(out['Meeting times with profs'])
+            del out['Meeting times with profs']
 
         # Parse SWV_CLASS_SEARCH_JSON_CLOB into a readable message
         if "SWV_CLASS_SEARCH_JSON_CLOB" in out and isinstance(out["SWV_CLASS_SEARCH_JSON_CLOB"], list):

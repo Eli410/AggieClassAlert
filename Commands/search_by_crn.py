@@ -77,12 +77,12 @@ class CRNSubmissionModal(Modal):
             cv = await HOWDY_API.get_instructor_cv(instructor.get('MORE'))
             fp = io.BytesIO(cv)
             fp.seek(0)
-            cv_message = await self.interaction.client.FILES_CHANNEL.send(file=discord.File(fp, filename=f"CV_{instructor['NAME'].replace(' ', '_')}.pdf"))
+            cv_message = await self.interaction.client.SYLLABUS_CHANNEL.send(file=discord.File(fp, filename=f"CV_{instructor['NAME'].replace(' ', '_')}.pdf"))
             instructor['CV'] = cv_message.attachments[0].url
         if syllabus:
             fp = io.BytesIO(syllabus)
             fp.seek(0)
-            syllabus = await self.interaction.client.FILES_CHANNEL.send(file=discord.File(fp, filename=f"Syllabus_{crn}.pdf"))
+            syllabus = await self.interaction.client.SYLLABUS_CHANNEL.send(file=discord.File(fp, filename=f"Syllabus_{crn}.pdf"))
             syllabus_url = syllabus.attachments[0].url
         else:
             syllabus_url = None

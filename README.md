@@ -12,11 +12,7 @@ You interface with the bot through slash commands, buttons and drop-down menus, 
  - `subject`: The 4 letter code or major names that your class is in. e.g. (CSCE - Computer Sci & Engr)
  - `course_number`: The course number for the class you are looking for. e.g. (221 - DATA STRUC & ALGORITHMS)
 
-3. `/search_by_instructor`: This is another way to search for a section of a class, this time by instructor, it takes 2 **required** arguments:
- - `term`: same as above
- - `instructor`: The name of the instructor you would like to search for.
-
-4. `/status`: This just pings the bot.
+3. `/status`: This just pings the bot.
 
 Once you searched for a class, an embed with all the sections will show up, you can use the button to toggle between full and available sections, the use the drop-down menu to select a spacific section, the embed should reflect your selection by listing only that section, then you can use the drop-down menu again to select the type of alert you would like to setup.
 
