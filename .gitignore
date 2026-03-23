@@ -6,3 +6,4 @@ env/
 .env
 .venv
 test.py
+.cursor/
