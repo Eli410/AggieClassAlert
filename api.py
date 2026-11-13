@@ -1,5 +1,5 @@
-ALL_TERMS_URL = 'https://howdyportal.tamu.edu/api/all-terms'
-CLASS_LIST_URL = 'https://howdyportal.tamu.edu/api/course-sections'
+ALL_TERMS_URL = ''
+CLASS_LIST_URL = ''
 
 import requests 
 import aiohttp
